@@ -10,9 +10,9 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  digitalWrite(3, HIGH); 
-  delay(40); 
-  digitalWrite(3, LOW); 
-  delay(40); 
+  digitalWrite(PB3, HIGH); 
+  delay(30); 
+  digitalWrite(PB3, LOW); 
+  delay(30); 
 }
 
