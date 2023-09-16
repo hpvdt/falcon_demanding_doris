@@ -2,6 +2,12 @@
 
 // read HX711
 
+/* 
+  hx711: 
+    PB1 - mosfet
+    PB4 - attiny to hx711
+    PB3 - output
+*/
 
 void setup() {
   // put your setup code here, to run once:
