@@ -11,8 +11,8 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   digitalWrite(PB3, HIGH); 
-  delay(30); 
+  delay(50); 
   digitalWrite(PB3, LOW); 
-  delay(30); 
+  delay(50); 
 }
 
