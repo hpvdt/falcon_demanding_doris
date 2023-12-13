@@ -2,11 +2,13 @@
 
 // read HX711
 
-/* 
-  hx711: 
-    PB1 - mosfet
-    PB4 - attiny to hx711
-    PB3 - output
+/* Pin allocations
+    PB0 - Resistive dividers for address
+    PB1 - One Wire TX
+    PB2 - Data from HX711
+    PB3 - One Wire RX
+    PB4 - Clock to HX711
+    PB5 - RESET
 */
 
 void setup() {
