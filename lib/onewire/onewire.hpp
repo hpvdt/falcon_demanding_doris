@@ -5,5 +5,6 @@
 
 void setupOneWire(uint8_t RX, uint8_t TX, uint8_t address = 0, bool isListener = true);
 void requestOneWire(uint8_t targetAdd, int32_t *destination);
+void setPayload(int32_t newPayload);
 
 #endif

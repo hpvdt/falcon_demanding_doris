@@ -109,3 +109,9 @@ void requestOneWire(uint8_t targetAdd, int32_t *destination) {
         *(destination) = *(destination) | (0xFFFFFFFF << (dataWidth - 1));
     }
 }
+
+void setPayload(int32_t newPayload) {
+    noInterrupts();
+    oneWirePayload = newPayload;
+    interrupts();
+}
