@@ -1,4 +1,6 @@
 #include <Arduino.h>
+#include <avr/io.h>
+#include <avr/interrupt.h>
 
 #include "onewire.hpp"
 
@@ -6,8 +8,9 @@ void handleOneWireInput(); // Since it is only meant to be used as an interrupt 
 
 const uint8_t bitPeriod = 50; // Period for each bit in us
 const uint8_t addressWidth = 4; // Number of bits for device addresses
+const uint8_t delayLag = 6;
 const uint8_t dataWidth = 24;
-const bool lineActive = LOW;
+const bool lineActive = HIGH;
 
 uint8_t pinRX, pinTX;
 volatile uint8_t oneWireAddress;
@@ -29,8 +32,24 @@ void setupOneWire(uint8_t RX, uint8_t TX, uint8_t address, bool isListener) {
     digitalWrite(pinTX, LOW);
 
     oneWireAddress = address;
+#ifdef ARD_NANO
+    if (isListener) {
+        attachInterrupt(digitalPinToInterrupt(pinRX), handleOneWireInput, CHANGE);
+        interrupts();
+    }
+#else
+    if (isListener) {
+        cli();                  // Disable interrupts during setup
+        PCMSK |= (1 << pinRX);  // Enable interrupt handler (ISR) for our chosen interrupt pin
+        GIMSK |= (1 << PCIE);   // Enable PCINT interrupt in the general interrupt mask
+        sei(); 
+    }
+#endif
+}
 
-    if (isListener) attachInterrupt(digitalPinToInterrupt(pinRX), handleOneWireInput, FALLING);
+// Call the handler in an interrupt service routine
+ISR(PCINT0_vect) {
+  handleOneWireInput();
 }
 
 /**
@@ -43,14 +62,14 @@ void handleOneWireInput() {
     uint8_t addressIn = 0;
 
     for (uint8_t i = 0; i < addressWidth; i++) {
-        delayMicroseconds(bitPeriod);
+        delayMicroseconds(bitPeriod - delayLag);
         addressIn = addressIn << 1;
         if (digitalRead(pinRX) == lineActive) addressIn = addressIn + 1;
     }
 
     // If address is not matched then just sit out the rest of the transaction
     if (addressIn != oneWireAddress) {
-        delayMicroseconds(dataWidth * bitPeriod);
+        delayMicroseconds(dataWidth * bitPeriod - delayLag);
         return;
     }
 
@@ -67,8 +86,10 @@ void handleOneWireInput() {
         if (makeLineActive) digitalWrite(pinTX, !lineActive);
         else digitalWrite(pinTX, lineActive);
 
-        delayMicroseconds(bitPeriod);
+        delayMicroseconds(bitPeriod - delayLag);
     }
+
+    digitalWrite(pinTX, LOW); // Release line
 }
 
 /**
@@ -80,11 +101,12 @@ void handleOneWireInput() {
 void requestOneWire(uint8_t targetAdd, int32_t *destination) {
 
     *(destination) = 0; // Reset destination value
+    noInterrupts(); // Don't want it catching it's own messages
 
     // Pull line down for a half period to get attention of all devices
     // Half period so that it line has more time to settle between bits
     digitalWrite(pinTX, HIGH);
-    delayMicroseconds(bitPeriod / 2);
+    delayMicroseconds(bitPeriod / 2 - delayLag);
 
     // Send out address
     const int32_t maskedBitToSend = 1 << (addressWidth - 1);
@@ -95,13 +117,14 @@ void requestOneWire(uint8_t targetAdd, int32_t *destination) {
         if (makeLineActive) digitalWrite(pinTX, !lineActive);
         else digitalWrite(pinTX, lineActive);
 
-        delayMicroseconds(bitPeriod);
+        delayMicroseconds(bitPeriod - delayLag);
     }
+    digitalWrite(pinTX, LOW); // Release line to called device
 
     for (uint8_t i = 0; i < dataWidth; i++) {
         *(destination) = *(destination) << 1;
         if (digitalRead(pinRX) == lineActive) *(destination) = *(destination) + 1;
-        delayMicroseconds(bitPeriod);
+        delayMicroseconds(bitPeriod - delayLag);
     }
 
     // Extend sign by prefixing ones as needed
