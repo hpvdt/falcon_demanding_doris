@@ -27,8 +27,6 @@ const int owAdd = owAddTest;
 
 
 void setup() {
-
-
 #ifdef ARD_NANO
     setupOneWire(owRX, owTX, owAdd, false);
     Serial.begin(115200);
@@ -48,9 +46,9 @@ void loop() {
     int32_t rec = 0;
     requestOneWire(owAddTest, &rec);
     Serial.println(rec);
-    delay(5000);
+    delay(50);
 #else
-    setPayload(0b101010);
+    setPayload(millis());
     delay(20);
 #endif
 }

@@ -7,15 +7,17 @@
 void handleOneWireInput(); // Since it is only meant to be used as an interrupt it is locally scoped
 void sendData(uint32_t data, uint8_t width);
 
-const uint8_t bitPeriod = 50; // Period for each bit in us
+const uint8_t bitPeriod = 80; // Period for each bit in us (needs to be at least thrice `pulsePeriod`)
+const uint8_t pulsePeriod = 25; // Minimum period the pulse is held for a bit 
 const uint8_t addressWidth = 4; // Number of bits for device addresses
-const uint8_t delayLag = 6;
 const uint8_t dataWidth = 24;
-const bool lineActive = HIGH;
 
-uint8_t pinRX, pinTX;
+volatile uint8_t pinRX, pinTX;
 volatile uint8_t oneWireAddress;
-volatile int32_t oneWirePayload;
+volatile int32_t oneWirePayloadOut;
+volatile int32_t oneWirePayloadIn;
+volatile bool oneWireMessageReceived;
+volatile bool oneWireListener;
 
 /**
  * @brief Setups up a one wire interface
@@ -33,18 +35,14 @@ void setupOneWire(uint8_t RX, uint8_t TX, uint8_t address, bool isListener) {
     digitalWrite(pinTX, LOW);
 
     oneWireAddress = address;
+    oneWireListener = isListener;
 #ifdef ARD_NANO
-    if (isListener) {
-        attachInterrupt(digitalPinToInterrupt(pinRX), handleOneWireInput, CHANGE);
-        interrupts();
-    }
+    attachInterrupt(digitalPinToInterrupt(pinRX), handleOneWireInput, CHANGE);
 #else
-    if (isListener) {
-        cli();                  // Disable interrupts during setup
-        PCMSK |= (1 << pinRX);  // Enable interrupt handler (ISR) for our chosen interrupt pin
-        GIMSK |= (1 << PCIE);   // Enable PCINT interrupt in the general interrupt mask
-        sei(); 
-    }
+    noInterrupts();         // Disable interrupts during setup
+    PCMSK |= (1 << pinRX);  // Enable interrupt handler (ISR) for our chosen interrupt pin
+    GIMSK |= (1 << PCIE);   // Enable PCINT interrupt in the general interrupt mask
+    interrupts();
 #endif
 }
 
@@ -57,66 +55,114 @@ ISR(PCINT0_vect) {
  * @brief Handles potential requests from the one wire bus
  * 
  * @note Meant to be an interrupt
- * @warning Blocks for the entirety of a transmission even if not the requested unit!
+ * @warning Blocks for the entirety of a transmission to host if responding
  */
 void handleOneWireInput() {
-    uint8_t addressIn = 0;
+    static unsigned long lastEdge = 0; // Store previous edge timestamp
+    unsigned long present = micros();
+    unsigned long delta = present - lastEdge;
 
-    for (uint8_t i = 0; i < addressWidth; i++) {
-        delayMicroseconds(bitPeriod - delayLag);
-        addressIn = addressIn << 1;
-        if (digitalRead(pinRX) == lineActive) addressIn = addressIn + 1;
-    }
+    static uint8_t bitCount = 0;
+    static uint8_t ignoreCount = 0;
+    static uint32_t tempData = 0;
 
-    // If address is not matched then just sit out the rest of the transaction
-    if (addressIn != oneWireAddress) {
-        delayMicroseconds(dataWidth * bitPeriod - delayLag);
+    // Too short since last edge, ignore. Probably setting up the next actual edge
+    if (delta < (3 * pulsePeriod)) return;
+    else lastEdge = present;
+
+    // See if the edge is late (new message or timeout)
+    if (delta > (2 * bitPeriod)) {
+        bitCount = 0;
+        ignoreCount = 0;
+        tempData = 0;
         return;
     }
 
-    // Delay to allow other units to catch address before the response might confuse them collecting their address
-    delayMicroseconds(bitPeriod / 2);
+    // Are we ignoring data edges? (From other responders)
+    if (ignoreCount != 0) {
+        ignoreCount--;
+        return;
+    }
+    
+    // Process the edge
+    bool reading = digitalRead(pinRX);
+    tempData = (tempData << 1) + reading;
+    bitCount++;
+    
+    // Process depending on if it's a caller or not
+    if (oneWireListener) {
+        // If there's an address check for a match
+        if (bitCount == addressWidth) {
 
-    // Send out the data
-    sendData(oneWirePayload, dataWidth);
+            if (tempData == oneWireAddress) sendData(oneWirePayloadOut, dataWidth);
+            else {
+                // Ignore the other device's response
+                ignoreCount = dataWidth;
+            }
+
+            // Reset for next message
+            bitCount = 0;
+            tempData = 0;
+        }
+    }
+    else {
+        // If awaiting a response
+        if (bitCount == dataWidth) {
+            oneWireMessageReceived = true;
+
+            // Extend sign by prefixing ones as needed prior to recording it
+            if (tempData & (1L << (dataWidth - 1))) {
+                oneWirePayloadIn = tempData | (0xFFFFFFFF << (dataWidth - 1));
+            }
+            else oneWirePayloadIn = tempData; 
+
+            // Reset for next message
+            bitCount = 0;
+            ignoreCount = 0;
+            tempData = 0;
+        }
+    }
 }
 
 /**
  * @brief Requests and receives data from device on the one wire bus
+ * 
+ * @warning Leaves interrupts enabled once completed
  * 
  * @param targetAdd Address of the unit of interest
  * @param destination Pointer to location to store response from target
  */
 void requestOneWire(uint8_t targetAdd, int32_t *destination) {
 
-    *(destination) = 0; // Reset destination value
     noInterrupts(); // Don't want it catching it's own messages
 
     // Pull line down for a half period to get attention of all devices
-    // Half period so that it line has more time to settle between bits
     digitalWrite(pinTX, HIGH);
-    delayMicroseconds(bitPeriod / 2 - delayLag);
+    delayMicroseconds(pulsePeriod);
 
     // Send out address
     sendData(targetAdd, addressWidth);
 
     // Read data in from line
-    for (uint8_t i = 0; i < dataWidth; i++) {
-        *(destination) = *(destination) << 1;
-        if (digitalRead(pinRX) == lineActive) *(destination) = *(destination) + 1;
-        delayMicroseconds(bitPeriod - delayLag);
+    unsigned long timeoutMark = millis() + 10;
+    while (!oneWireMessageReceived && (millis() < timeoutMark)) {
+        //delayMicroseconds(1000);
     }
 
-    // Extend sign by prefixing ones as needed
-    if (*(destination) & (1L << (dataWidth - 1))) {
-        *(destination) = *(destination) | (0xFFFFFFFF << (dataWidth - 1));
-    }
+    digitalWrite(13, HIGH);
+
+    if (oneWireMessageReceived) *(destination) = oneWirePayloadIn; 
+    else *(destination) = 0;
+
+    oneWireMessageReceived = false;
 }
 
 /**
  * @brief Send data over one wire interface
  * 
- * @note Shifts data out MSB first
+ * @note Shifts data out MSB first. Positive dominant edges are for 1.
+ * 
+ * @warning Leaves interrupts enabled on completion
  * 
  * @param data Payload to send
  * @param width The width of the data to send in bits
@@ -124,15 +170,15 @@ void requestOneWire(uint8_t targetAdd, int32_t *destination) {
 void sendData(uint32_t data, uint8_t width) {
     noInterrupts(); // Don't want interrupts to catch outgoing message
 
-    uint32_t mask = 1 << (width - 1);
-    for (uint8_t i = 0; i < addressWidth; i++) {
-        bool makeLineActive = ((mask & (data << i)) != 0);
+    for (uint8_t i = width; i > 0; i--) {
+        uint32_t mask = 1L << (i - 1); // Needs the `1L` otherwise mask will be 16 bits wide
 
-        // Since the output gets inverter due to the inverter the opposite line active state is written out
-        if (makeLineActive) digitalWrite(pinTX, !lineActive);
-        else digitalWrite(pinTX, lineActive);
+        bool currentBit = ((mask & data) != 0);
 
-        delayMicroseconds(bitPeriod - delayLag);
+        digitalWrite(pinTX, currentBit);
+        delayMicroseconds(bitPeriod - pulsePeriod);
+        digitalWrite(pinTX, !currentBit);
+        delayMicroseconds(pulsePeriod);
     }
 
     digitalWrite(pinTX, LOW); // Release line
@@ -146,6 +192,6 @@ void sendData(uint32_t data, uint8_t width) {
  */
 void setPayload(int32_t newPayload) {
     noInterrupts();
-    oneWirePayload = newPayload;
+    oneWirePayloadOut = newPayload;
     interrupts();
 }
