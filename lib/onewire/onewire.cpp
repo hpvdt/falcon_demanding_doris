@@ -7,8 +7,8 @@
 void handleOneWireInput(); // Since it is only meant to be used as an interrupt it is locally scoped
 void sendData(uint32_t data, uint8_t width);
 
-const uint8_t bitPeriod = 80; // Period for each bit in us (needs to be at least thrice `pulsePeriod`)
-const uint8_t pulsePeriod = 25; // Minimum period the pulse is held for a bit 
+const uint8_t bitPeriod = 65; // Period for each bit in us (needs to be at least thrice `pulsePeriod`)
+const uint8_t pulsePeriod = 15; // Minimum period the pulse is held for a bit 
 const uint8_t addressWidth = 4; // Number of bits for device addresses
 const uint8_t dataWidth = 24;
 
@@ -36,20 +36,22 @@ void setupOneWire(uint8_t RX, uint8_t TX, uint8_t address, bool isListener) {
 
     oneWireAddress = address;
     oneWireListener = isListener;
-#ifdef ARD_NANO
-    attachInterrupt(digitalPinToInterrupt(pinRX), handleOneWireInput, CHANGE);
-#else
+#ifdef ATTINY_CORE
     noInterrupts();         // Disable interrupts during setup
     PCMSK |= (1 << pinRX);  // Enable interrupt handler (ISR) for our chosen interrupt pin
     GIMSK |= (1 << PCIE);   // Enable PCINT interrupt in the general interrupt mask
     interrupts();
+#else
+    attachInterrupt(digitalPinToInterrupt(pinRX), handleOneWireInput, CHANGE);
 #endif
 }
 
+#ifdef ATTINY_CORE
 // Call the handler in an interrupt service routine
 ISR(PCINT0_vect) {
   handleOneWireInput();
 }
+#endif
 
 /**
  * @brief Handles potential requests from the one wire bus
@@ -60,6 +62,12 @@ ISR(PCINT0_vect) {
 void handleOneWireInput() {
     static unsigned long lastEdge = 0; // Store previous edge timestamp
     unsigned long present = micros();
+
+#ifdef ATTINY_CORE
+    bool reading = PINB & (1 << pinRX);
+#else
+    bool reading = digitalRead(pinRX);
+#endif
     unsigned long delta = present - lastEdge;
 
     static uint8_t bitCount = 0;
@@ -85,7 +93,6 @@ void handleOneWireInput() {
     }
     
     // Process the edge
-    bool reading = digitalRead(pinRX);
     tempData = (tempData << 1) + reading;
     bitCount++;
     
@@ -149,8 +156,6 @@ void requestOneWire(uint8_t targetAdd, int32_t *destination) {
         //delayMicroseconds(1000);
     }
 
-    digitalWrite(13, HIGH);
-
     if (oneWireMessageReceived) *(destination) = oneWirePayloadIn; 
     else *(destination) = 0;
 
@@ -170,15 +175,36 @@ void requestOneWire(uint8_t targetAdd, int32_t *destination) {
 void sendData(uint32_t data, uint8_t width) {
     noInterrupts(); // Don't want interrupts to catch outgoing message
 
+#ifdef ATTINY_CORE
+    // Port values to set TX without changing other pins
+    uint8_t outputLow = PORTB & ~(1 << pinTX);
+    uint8_t outputHigh = PORTB | (1 << pinTX);
+#endif
+
     for (uint8_t i = width; i > 0; i--) {
         uint32_t mask = 1L << (i - 1); // Needs the `1L` otherwise mask will be 16 bits wide
 
         bool currentBit = ((mask & data) != 0);
-
+#ifdef ATTINY_CORE
+        // Probably the ATtiny85
+        if (currentBit == true) {
+            PORTB = outputHigh;
+            delayMicroseconds(bitPeriod - pulsePeriod);
+            PORTB = outputLow;
+            delayMicroseconds(pulsePeriod);
+        }
+        else {
+            PORTB = outputLow;
+            delayMicroseconds(bitPeriod - pulsePeriod);
+            PORTB = outputHigh;
+            delayMicroseconds(pulsePeriod);
+        }
+#else
         digitalWrite(pinTX, currentBit);
         delayMicroseconds(bitPeriod - pulsePeriod);
         digitalWrite(pinTX, !currentBit);
         delayMicroseconds(pulsePeriod);
+#endif
     }
 
     digitalWrite(pinTX, LOW); // Release line
