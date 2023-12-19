@@ -138,10 +138,13 @@ void handleOneWireInput() {
  * 
  * @param targetAdd Address of the unit of interest
  * @param destination Pointer to location to store response from target
+ * 
+ * @return True if message was received
  */
-void requestOneWire(uint8_t targetAdd, int32_t *destination) {
+bool requestOneWire(uint8_t targetAdd, int32_t *destination) {
 
     noInterrupts(); // Don't want it catching it's own messages
+    oneWireMessageReceived = false; // Clear received flag
 
     // Pull line down for a half period to get attention of all devices
     digitalWrite(pinTX, HIGH);
@@ -157,9 +160,9 @@ void requestOneWire(uint8_t targetAdd, int32_t *destination) {
     }
 
     if (oneWireMessageReceived) *(destination) = oneWirePayloadIn; 
-    else *(destination) = 0;
+    //else *(destination) = 0;
 
-    oneWireMessageReceived = false;
+    return oneWireMessageReceived;
 }
 
 /**
