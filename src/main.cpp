@@ -31,7 +31,8 @@ void setup() {
     setupOneWire(owRX, owTX, owAdd, false);
     Serial.begin(115200);
     delay(100);
-    Serial.println("RUNNING THE MAIN STATION CODE");
+    Serial.println("RUNNING THE TEST STATION CODE");
+    Serial.println("MISSES / TESTS");
 
     int32_t rec;
     requestOneWire(owAddTest, &rec);
@@ -43,10 +44,17 @@ void setup() {
 
 void loop() {
 #ifdef ARD_NANO
+    static unsigned int count = 0;
+    static unsigned int missed = 0;
+
     int32_t rec = 0;
-    requestOneWire(owAddTest, &rec);
-    Serial.println(rec);
-    delay(50);
+    if (requestOneWire(owAddTest, &rec) == false) missed++;
+    count++;
+
+    Serial.print(missed);
+    Serial.print("/");
+    Serial.println(count);
+    delay(5);
 #else
     setPayload(millis());
     delay(20);
