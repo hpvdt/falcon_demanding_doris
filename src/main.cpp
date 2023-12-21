@@ -15,7 +15,7 @@
 */
 
 const int owAddMain = 2;
-const int owAddTest = 0b1010;
+const int owAddTest = 0b1010; // Hardcoded address for spar boards.
 
 #ifdef ARD_NANO
 #warning "COMPILING FOR ARDUINO NANO"
@@ -63,9 +63,6 @@ void loop() {
 #ifdef ATTINY_CORE
     if (readyHX())setPayload(readHX());
     else delay(5);
-#else
-    setPayload(millis());
-    delay(20);
 #endif
 #endif
 }
