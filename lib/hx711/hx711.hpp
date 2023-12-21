@@ -4,11 +4,14 @@
 #include <Arduino.h>
 
 #ifndef ATTINY_CORE
-#error "HX711 Library not meant for chips other than the ATtiny85!"
-#endif
+#warning "HX711 Library not meant for chips other than the ATtiny85!"
+void setupHX() __attribute__ ((unavailable));
+bool readyHX() __attribute__ ((unavailable));
+uint32_t readHX() __attribute__ ((unavailable));
 
+#else
 void setupHX();
 bool readyHX();
 uint32_t readHX();
-
+#endif
 #endif
