@@ -1,5 +1,8 @@
 #include <Arduino.h>
 
+#ifdef ATTINY_CORE
+#include "hx711.hpp"
+#endif
 #include "onewire.hpp"
 
 /* Pin allocations
@@ -39,6 +42,7 @@ void setup() {
     Serial.println(rec);
 #else
     setupOneWire(owRX, owTX, owAdd, true);
+    setupHX();
 #endif
 }
 
@@ -56,8 +60,13 @@ void loop() {
     Serial.println(count);
     delay(5);
 #else
+#ifdef ATTINY_CORE
+    if (readyHX())setPayload(readHX());
+    else delay(5);
+#else
     setPayload(millis());
     delay(20);
+#endif
 #endif
 }
 
