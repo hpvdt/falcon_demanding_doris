@@ -12,6 +12,9 @@ const uint8_t pulsePeriod = 15; // Minimum period the pulse is held for a bit
 const uint8_t addressWidth = 4; // Number of bits for device addresses
 const uint8_t dataWidth = 24;
 
+const uint8_t numberAttempts = 3;
+const uint16_t timeoutComms = 2000; // Timeout after sending a request in us
+
 volatile uint8_t pinRX, pinTX;
 volatile uint8_t oneWireAddress;
 volatile int32_t oneWirePayloadOut;
@@ -143,21 +146,27 @@ void handleOneWireInput() {
  */
 bool requestOneWire(uint8_t targetAdd, int32_t *destination) {
 
-    noInterrupts(); // Don't want it catching it's own messages
-    oneWireMessageReceived = false; // Clear received flag
+    uint8_t attempts = 0;
 
-    // Pull line down for a half period to get attention of all devices
-    digitalWrite(pinTX, HIGH);
-    delayMicroseconds(pulsePeriod);
+    do {
+        noInterrupts(); // Don't want it catching it's own messages
+        oneWireMessageReceived = false; // Clear received flag
 
-    // Send out address
-    sendData(targetAdd, addressWidth);
+        // Pull line down for a half period to get attention of all devices
+        digitalWrite(pinTX, HIGH);
+        delayMicroseconds(pulsePeriod);
 
-    // Read data in from line
-    unsigned long timeoutMark = millis() + 10;
-    while (!oneWireMessageReceived && (millis() < timeoutMark)) {
-        //delayMicroseconds(1000);
-    }
+        // Send out address
+        sendData(targetAdd, addressWidth);
+
+        // Read data in from line
+        unsigned long timeoutMark = micros() + timeoutComms;
+        while (!oneWireMessageReceived && (micros() < timeoutMark)) {
+            //delayMicroseconds(1000);
+        }
+
+        attempts++;
+    } while (!oneWireMessageReceived && (attempts < numberAttempts));
 
     if (oneWireMessageReceived) *(destination) = oneWirePayloadIn; 
     //else *(destination) = 0;
