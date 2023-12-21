@@ -79,11 +79,11 @@ void handleOneWireInput() {
     static uint32_t tempData = 0;
 
     // Too short since last edge, ignore. Probably setting up the next actual edge
-    if (delta < (3 * pulsePeriod)) return;
+    if (delta < (3 * oneWirePulsePeriod)) return;
     else lastEdge = present;
 
     // See if the edge is late (new message or timeout)
-    if (delta > (2 * bitPeriod)) {
+    if (delta > (2 * oneWireBitPeriod)) {
         bitCount = 0;
         ignoreCount = 0;
         tempData = 0;
@@ -103,12 +103,12 @@ void handleOneWireInput() {
     // Process depending on if it's a caller or not
     if (oneWireListener) {
         // If there's an address check for a match
-        if (bitCount == addressWidth) {
+        if (bitCount == oneWireAddressWidth) {
 
-            if (tempData == oneWireAddress) sendData(oneWirePayloadOut, dataWidth);
+            if (tempData == oneWireAddress) sendData(oneWirePayloadOut, oneWireDataWidth);
             else {
                 // Ignore the other device's response
-                ignoreCount = dataWidth;
+                ignoreCount = oneWireDataWidth;
             }
 
             // Reset for next message
@@ -118,12 +118,12 @@ void handleOneWireInput() {
     }
     else {
         // If awaiting a response
-        if (bitCount == dataWidth) {
+        if (bitCount == oneWireDataWidth) {
             oneWireMessageReceived = true;
 
             // Extend sign by prefixing ones as needed prior to recording it
-            if (tempData & (1L << (dataWidth - 1))) {
-                oneWirePayloadIn = tempData | (0xFFFFFFFF << (dataWidth - 1));
+            if (tempData & (1L << (oneWireDataWidth - 1))) {
+                oneWirePayloadIn = tempData | (0xFFFFFFFF << (oneWireDataWidth - 1));
             }
             else oneWirePayloadIn = tempData; 
 
@@ -155,19 +155,19 @@ bool requestOneWire(uint8_t targetAdd, int32_t *destination) {
 
         // Pull line down for a half period to get attention of all devices
         digitalWrite(pinTX, HIGH);
-        delayMicroseconds(pulsePeriod);
+        delayMicroseconds(oneWirePulsePeriod);
 
         // Send out address
-        sendData(targetAdd, addressWidth);
+        sendData(targetAdd, oneWireAddressWidth);
 
         // Read data in from line
-        unsigned long timeoutMark = micros() + timeoutComms;
+        unsigned long timeoutMark = micros() + oneWireTimeoutComms;
         while (!oneWireMessageReceived && (micros() < timeoutMark)) {
             //delayMicroseconds(1000);
         }
 
         attempts++;
-    } while (!oneWireMessageReceived && (attempts < numberAttempts));
+    } while (!oneWireMessageReceived && (attempts < oneWireNumAttempts));
 
     if (oneWireMessageReceived) *(destination) = oneWirePayloadIn; 
     //else *(destination) = 0;
@@ -202,21 +202,21 @@ void sendData(uint32_t data, uint8_t width) {
         // Probably the ATtiny85
         if (currentBit == true) {
             PORTB = outputHigh;
-            delayMicroseconds(bitPeriod - pulsePeriod);
+            delayMicroseconds(oneWireBitPeriod - oneWirePulsePeriod);
             PORTB = outputLow;
-            delayMicroseconds(pulsePeriod);
+            delayMicroseconds(oneWirePulsePeriod);
         }
         else {
             PORTB = outputLow;
-            delayMicroseconds(bitPeriod - pulsePeriod);
+            delayMicroseconds(oneWireBitPeriod - oneWirePulsePeriod);
             PORTB = outputHigh;
-            delayMicroseconds(pulsePeriod);
+            delayMicroseconds(oneWirePulsePeriod);
         }
 #else
         digitalWrite(pinTX, currentBit);
-        delayMicroseconds(bitPeriod - pulsePeriod);
+        delayMicroseconds(bitPeriod - oneWirePulsePeriod);
         digitalWrite(pinTX, !currentBit);
-        delayMicroseconds(pulsePeriod);
+        delayMicroseconds(oneWirePulsePeriod);
 #endif
     }
 

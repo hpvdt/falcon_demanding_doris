@@ -3,12 +3,12 @@
 
 #include <stdint.h>
 
-extern const uint8_t bitPeriod; // Period for each bit in us (needs to be at least thrice `pulsePeriod`)
-extern const uint8_t pulsePeriod; // Minimum period the pulse is held for a bit 
-extern const uint8_t addressWidth; // Number of bits for device addresses
-extern const uint8_t dataWidth;
+extern const uint8_t oneWireBitPeriod;
+extern const uint8_t oneWirePulsePeriod;
+extern const uint8_t oneWireAddressWidth;
+extern const uint8_t oneWireDataWidth;
 
-extern const uint8_t numberAttempts;
-extern const uint16_t timeoutComms; // Timeout after sending a request in us
+extern const uint8_t oneWireNumAttempts;
+extern const uint16_t oneWireTimeoutComms;
 
 #endif
