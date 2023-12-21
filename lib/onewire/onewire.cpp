@@ -3,17 +3,10 @@
 #include <avr/interrupt.h>
 
 #include "onewire.hpp"
+#include "onewireConfig.hpp"
 
 void handleOneWireInput(); // Since it is only meant to be used as an interrupt it is locally scoped
 void sendData(uint32_t data, uint8_t width);
-
-const uint8_t bitPeriod = 65; // Period for each bit in us (needs to be at least thrice `pulsePeriod`)
-const uint8_t pulsePeriod = 15; // Minimum period the pulse is held for a bit 
-const uint8_t addressWidth = 4; // Number of bits for device addresses
-const uint8_t dataWidth = 24;
-
-const uint8_t numberAttempts = 3;
-const uint16_t timeoutComms = 2000; // Timeout after sending a request in us
 
 #ifdef ATTINY_CORE
 // Hardcode as constants to compile more optimized code
