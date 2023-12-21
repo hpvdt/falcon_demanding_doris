@@ -15,7 +15,13 @@ const uint8_t dataWidth = 24;
 const uint8_t numberAttempts = 3;
 const uint16_t timeoutComms = 2000; // Timeout after sending a request in us
 
+#ifdef ATTINY_CORE
+// Hardcode as constants to compile more optimized code
+const uint8_t pinRX = PB3;
+const uint8_t pinTX = PB1;
+#else
 volatile uint8_t pinRX, pinTX;
+#endif
 volatile uint8_t oneWireAddress;
 volatile int32_t oneWirePayloadOut;
 volatile int32_t oneWirePayloadIn;
@@ -31,8 +37,10 @@ volatile bool oneWireListener;
  * @param isListener Set to true if device is listener (default is true). If a listener, it will set the handler interrupt routine up.
  */
 void setupOneWire(uint8_t RX, uint8_t TX, uint8_t address, bool isListener) {
+#ifndef ATTINY_CORE
     pinRX = RX;
     pinTX = TX;
+#endif
     pinMode(pinRX, INPUT);
     pinMode(pinTX, OUTPUT);
     digitalWrite(pinTX, LOW);
