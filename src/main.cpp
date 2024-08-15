@@ -14,34 +14,57 @@
     PB5 - RESET
 */
 
-const int owAddMain = 2;
-const int owAddTest = 0b1010; // Hardcoded address for spar boards.
+const int OW_MAIN_ADDRESS = 2;
+const int OW_TEST_ADDRESS = 0b1010; // Hardcoded address for spar boards.
 
 #ifdef ARD_NANO
 #warning "COMPILING FOR ARDUINO NANO"
-const int owTX  = 3;
-const int owRX  = 2;
-const int owAdd = owAddMain;
+const int OW_TX_PIN = 3;
+const int OW_RX_PIN = 2;
 #else
-const int owTX  = PB1;
-const int owRX  = PB3;
-const int owAdd = owAddTest;
+const int ADDRESS_PIN = PB0;
+const int OW_TX_PIN = PB1;
+const int OW_RX_PIN = PB3;
 #endif
 
+/**
+ * \brief Get the OneWire address for the board 
+ * 
+ * \note On ATtiny85-based boards this is done using a resistive divider
+ * 
+ * \return Address for the device to respond to
+ */
+uint8_t get_ow_address() {
+#ifdef __AVR_ATtiny85__
+    const uint16_t CUTOFF_MARKS[] = {51, 153, 245, 350, 456, 570, 670, 782, 870, 985};
+
+    pinMode(ADDRESS_PIN, INPUT); // Just in case someone's been fooling around
+    delay(5); // Allow pin to settle if it was previous driving
+    uint16_t adc_reading = analogRead(ADDRESS_PIN);
+
+    int8_t index;
+    for (int8_t index = 0; index < (sizeof(CUTOFF_MARKS) / sizeof(CUTOFF_MARKS[0])); index++) {
+        if (adc_reading < CUTOFF_MARKS[index]) return index;
+    }
+    return index;
+#else
+    return OW_TEST_ADDRESS;
+#endif
+}
 
 void setup() {
 #ifdef ARD_NANO
-    setupOneWire(owRX, owTX, owAdd, false);
+    setupOneWire(OW_RX_PIN, OW_TX_PIN, OW_MAIN_ADDRESS, false);
     Serial.begin(115200);
     delay(100);
     Serial.println("RUNNING THE TEST STATION CODE");
     Serial.println("MISSES / TESTS");
 
     int32_t rec;
-    requestOneWire(owAddTest, &rec);
     Serial.println(rec);
 #else
-    setupOneWire(owRX, owTX, owAdd, true);
+    uint8_t ow_address = get_ow_address();
+    setupOneWire(OW_RX_PIN, OW_TX_PIN, ow_address, true);
     setupHX();
 #endif
 }
@@ -52,7 +75,7 @@ void loop() {
     static unsigned int missed = 0;
 
     int32_t rec = 0;
-    if (requestOneWire(owAddTest, &rec) == false) missed++;
+    if (requestOneWire(OW_TEST_ADDRESS, &rec) == false) missed++;
     count++;
 
     Serial.print(missed);
