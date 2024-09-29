@@ -25,7 +25,7 @@ void setupHX() {
  * @return True if HX711 has data ready.
  */
 bool readyHX() {
-    return (digitalReadFast(PDSCK) == 0);
+    return (digitalReadFast(DOUT) == 0);
 }
 
 /**
