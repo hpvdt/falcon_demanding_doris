@@ -30,13 +30,14 @@ bool readyHX() {
 
 /**
  * @brief Reads value from HX711
- * @note Always sets HX711 to read with a gain of 128 on channel A
+ * 
+ * \param clocks Number of clocks to read (25 for next reading to be 128 gain on channel A, 26 for 32 gain channel B)
+ * 
  * @warning Disables interrupts during read
  * 
  * @return Reading, not sign extended
  */
-int32_t readHX() {
-    uint8_t clocks = 25;
+int32_t readHX(uint8_t clocks) {
 
     int32_t reading = 0L;
 

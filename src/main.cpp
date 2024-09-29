@@ -5,17 +5,10 @@
 #endif
 #include "onewire.hpp"
 
-/* Pin allocations
-    PB0 - Resistive dividers for address
-    PB1 - One Wire TX
-    PB2 - Data from HX711
-    PB3 - One Wire RX
-    PB4 - Clock to HX711
-    PB5 - RESET
-*/
-
 const int OW_MAIN_ADDRESS = 2;
 const int OW_TEST_ADDRESS = 0b1010; // Hardcoded address for spar boards.
+
+const uint8_t TORSION_ADDR_CUTOFF = 12; // Addresses of this and above will read for torsion (channel B)
 
 #ifdef ARD_NANO
 #warning "COMPILING FOR ARDUINO NANO"
@@ -25,6 +18,8 @@ const int OW_RX_PIN = 2;
 const int OW_TX_PIN = PIN_PA2;
 const int OW_RX_PIN = PIN_PA1;
 #endif
+
+uint8_t clocks_for_reading = 25; // Clocks to use for HX711 read (25 - Channel A, 26 - Channel B)
 
 /**
  * \brief Get the OneWire address for the board 
@@ -40,12 +35,16 @@ uint8_t get_ow_address() {
 #else
     // Configure address pins for digital input with pullups
     PORTC.DIRCLR = 0xF;
-    PORTC.PIN0CTRL = PIN_PULLUP_ON;
-    PORTC.PIN1CTRL = PIN_PULLUP_ON;
-    PORTC.PIN2CTRL = PIN_PULLUP_ON;
-    PORTC.PIN3CTRL = PIN_PULLUP_ON;
-    delay(10); // Just to ensure their values stabilize
-    index = PORTC.IN & 0xF;
+    uint8_t pin_setting = PORT_PULLUPEN_bm | PORT_INVEN_bm; // Invert so shorts are read as 1
+    PORTC.PIN0CTRL = pin_setting;
+    PORTC.PIN1CTRL = pin_setting;
+    PORTC.PIN2CTRL = pin_setting;
+    PORTC.PIN3CTRL = pin_setting;
+    delayMicroseconds(1000); // Just to ensure their values stabilize
+    index = VPORTC.IN & 0xF;
+
+    if (index >= TORSION_ADDR_CUTOFF) clocks_for_reading = 26;   // Torsion
+    else clocks_for_reading = 25;                               // Strain
 #endif
     return index;
 }
@@ -64,6 +63,10 @@ void setup() {
     uint8_t ow_address = get_ow_address();
     setupOneWire(OW_RX_PIN, OW_TX_PIN, ow_address, true);
     setupHX();
+
+    Serial.begin(9600);
+    // Serial.printf("\nAddress is %d, clocks %d", ow_address, clocks_for_reading);
+    // delay(5000);
 #endif
 }
 
@@ -81,7 +84,11 @@ void loop() {
     Serial.println(count);
     delay(5);
 #else
-    if (readyHX())setPayload(readHX());
+    if (readyHX()) {
+        int32_t payload = readHX(clocks_for_reading);
+        setPayload(payload);
+        Serial.println(payload);
+    }
     else delay(5);
 #endif
 }
