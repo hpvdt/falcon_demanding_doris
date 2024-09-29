@@ -8,10 +8,10 @@
 void handleOneWireInput(); // Since it is only meant to be used as an interrupt it is locally scoped
 void sendData(uint32_t data, uint8_t width);
 
-#ifdef ATTINY_CORE
+#ifndef ARD_NANO
 // Hardcode as constants to compile more optimized code
-const uint8_t pinRX = PB3;
-const uint8_t pinTX = PB1;
+const uint8_t pinRX = PIN_PA1;
+const uint8_t pinTX = PIN_PA2;
 #else
 volatile uint8_t pinRX, pinTX;
 #endif
@@ -30,7 +30,7 @@ volatile bool oneWireListener;
  * @param isListener Set to true if device is listener (default is true). If a listener, it will set the handler interrupt routine up.
  */
 void setupOneWire(uint8_t RX, uint8_t TX, uint8_t address, bool isListener) {
-#ifndef ATTINY_CORE
+#ifdef ARD_NANO
     pinRX = RX;
     pinTX = TX;
 #endif
@@ -40,22 +40,12 @@ void setupOneWire(uint8_t RX, uint8_t TX, uint8_t address, bool isListener) {
 
     oneWireAddress = address;
     oneWireListener = isListener;
-#ifdef ATTINY_CORE
-    noInterrupts();         // Disable interrupts during setup
-    PCMSK |= (1 << pinRX);  // Enable interrupt handler (ISR) for our chosen interrupt pin
-    GIMSK |= (1 << PCIE);   // Enable PCINT interrupt in the general interrupt mask
-    interrupts();
-#else
-    attachInterrupt(digitalPinToInterrupt(pinRX), handleOneWireInput, CHANGE);
-#endif
-}
 
-#ifdef ATTINY_CORE
-// Call the handler in an interrupt service routine
-ISR(PCINT0_vect) {
-  handleOneWireInput();
-}
+    attachInterrupt(digitalPinToInterrupt(pinRX), handleOneWireInput, CHANGE);
+#ifndef ARD_NANO
+    CPUINT.LVL1VEC = PORTA_PORT_vect_num; // Make the OneWire interrupt top priority
 #endif
+}
 
 /**
  * @brief Handles potential requests from the one wire bus
@@ -67,8 +57,9 @@ void handleOneWireInput() {
     static unsigned long lastEdge = 0; // Store previous edge timestamp
     unsigned long present = micros();
 
-#ifdef ATTINY_CORE
-    bool reading = PINB & (1 << pinRX);
+#ifndef ARD_NANO
+    // Read directly from registers for max speed
+    bool reading = (VPORTA.IN & digital_pin_to_bit_mask[pinRX]) >> digital_pin_to_bit_position[pinRX];
 #else
     bool reading = digitalRead(pinRX);
 #endif
@@ -188,39 +179,39 @@ bool requestOneWire(uint8_t targetAdd, int32_t *destination) {
 void sendData(uint32_t data, uint8_t width) {
     noInterrupts(); // Don't want interrupts to catch outgoing message
 
-#ifdef ATTINY_CORE
+#ifndef ARD_NANO
     // Port values to set TX without changing other pins
-    uint8_t outputLow = PORTB & ~(1 << pinTX);
-    uint8_t outputHigh = PORTB | (1 << pinTX);
+    uint8_t pin_mask = digital_pin_to_bit_mask[pinTX];
 #endif
 
     for (uint8_t i = width; i > 0; i--) {
-        uint32_t mask = 1L << (i - 1); // Needs the `1L` otherwise mask will be 16 bits wide
+        bool currentBit = data & 1;
+        data = data >> 1;
 
-        bool currentBit = ((mask & data) != 0);
-#ifdef ATTINY_CORE
-        // Probably the ATtiny85
-        if (currentBit == true) {
-            PORTB = outputHigh;
-            delayMicroseconds(oneWireBitPeriod - oneWirePulsePeriod);
-            PORTB = outputLow;
-            delayMicroseconds(oneWirePulsePeriod);
-        }
-        else {
-            PORTB = outputLow;
-            delayMicroseconds(oneWireBitPeriod - oneWirePulsePeriod);
-            PORTB = outputHigh;
-            delayMicroseconds(oneWirePulsePeriod);
-        }
-#else
+#ifdef ARD_NANO
         digitalWrite(pinTX, currentBit);
         delayMicroseconds(bitPeriod - oneWirePulsePeriod);
         digitalWrite(pinTX, !currentBit);
         delayMicroseconds(oneWirePulsePeriod);
+#else
+        if (currentBit == true) {
+            // Falling edge for 1 bit
+            PORTA.OUTSET = pin_mask;
+            delayMicroseconds(oneWireBitPeriod - oneWirePulsePeriod);
+            PORTA.OUTCLR = pin_mask;
+            delayMicroseconds(oneWirePulsePeriod);
+        }
+        else {
+            // Rising edge for 0 bit
+            PORTA.OUTCLR = pin_mask;
+            delayMicroseconds(oneWireBitPeriod - oneWirePulsePeriod);
+            PORTA.OUTSET = pin_mask;
+            delayMicroseconds(oneWirePulsePeriod);
+        }
 #endif
     }
 
-    digitalWrite(pinTX, LOW); // Release line
+    digitalWriteFast(pinTX, LOW); // Release line
     interrupts();
 }
 

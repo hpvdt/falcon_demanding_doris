@@ -1,6 +1,6 @@
 #include <Arduino.h>
 
-#ifdef ATTINY_CORE
+#ifndef ARD_NANO
 #include "hx711.hpp"
 #endif
 #include "onewire.hpp"
@@ -22,9 +22,8 @@ const int OW_TEST_ADDRESS = 0b1010; // Hardcoded address for spar boards.
 const int OW_TX_PIN = 3;
 const int OW_RX_PIN = 2;
 #else
-const int ADDRESS_PIN = PB0;
-const int OW_TX_PIN = PB1;
-const int OW_RX_PIN = PB3;
+const int OW_TX_PIN = PIN_PA2;
+const int OW_RX_PIN = PIN_PA1;
 #endif
 
 /**
@@ -35,21 +34,20 @@ const int OW_RX_PIN = PB3;
  * \return Address for the device to respond to
  */
 uint8_t get_ow_address() {
-#ifdef __AVR_ATtiny85__
-    const uint16_t CUTOFF_MARKS[] = {51, 153, 245, 350, 456, 570, 670, 782, 870, 985};
-
-    pinMode(ADDRESS_PIN, INPUT); // Just in case someone's been fooling around
-    delay(5); // Allow pin to settle if it was previous driving
-    uint16_t adc_reading = analogRead(ADDRESS_PIN);
-
     int8_t index;
-    for (int8_t index = 0; index < (sizeof(CUTOFF_MARKS) / sizeof(CUTOFF_MARKS[0])); index++) {
-        if (adc_reading < CUTOFF_MARKS[index]) return index;
-    }
-    return index;
+#ifdef ARD_NANO
+    index = OW_TEST_ADDRESS;
 #else
-    return OW_TEST_ADDRESS;
+    // Configure address pins for digital input with pullups
+    PORTC.DIRCLR = 0xF;
+    PORTC.PIN0CTRL = PIN_PULLUP_ON;
+    PORTC.PIN1CTRL = PIN_PULLUP_ON;
+    PORTC.PIN2CTRL = PIN_PULLUP_ON;
+    PORTC.PIN3CTRL = PIN_PULLUP_ON;
+    delay(10); // Just to ensure their values stabilize
+    index = PORTC.IN & 0xF;
 #endif
+    return index;
 }
 
 void setup() {
@@ -83,10 +81,8 @@ void loop() {
     Serial.println(count);
     delay(5);
 #else
-#ifdef ATTINY_CORE
     if (readyHX())setPayload(readHX());
     else delay(5);
-#endif
 #endif
 }
 
