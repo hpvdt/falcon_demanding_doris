@@ -8,6 +8,9 @@
 void handleOneWireInput(); // Since it is only meant to be used as an interrupt it is locally scoped
 void sendData(uint32_t data, uint8_t width);
 
+unsigned long led_timeout = 0;
+const unsigned long LED_PERIOD = 3000; // Period to illumniate following a scan
+
 #ifndef ARD_NANO
 // Hardcode as constants to compile more optimized code
 const uint8_t pinRX = PIN_PA1;
@@ -56,6 +59,8 @@ void setupOneWire(uint8_t RX, uint8_t TX, uint8_t address, bool isListener) {
 void handleOneWireInput() {
     static unsigned long lastEdge = 0; // Store previous edge timestamp
     unsigned long present = micros();
+
+    led_timeout = millis() + LED_PERIOD;
 
 #ifndef ARD_NANO
     // Read directly from registers for max speed

@@ -5,6 +5,10 @@
 #endif
 #include "onewire.hpp"
 
+// Both LEDs are PWM enabled
+const pin_size_t LED_ORANGE = PIN_PA3;
+const pin_size_t LED_RED = PIN_PB0; // Usually not installed
+
 const int OW_MAIN_ADDRESS = 2;
 const int OW_TEST_ADDRESS = 0b1010; // Hardcoded address for spar boards.
 
@@ -15,8 +19,8 @@ const uint8_t TORSION_ADDR_CUTOFF = 12; // Addresses of this and above will read
 const int OW_TX_PIN = 3;
 const int OW_RX_PIN = 2;
 #else
-const int OW_TX_PIN = PIN_PA2;
-const int OW_RX_PIN = PIN_PA1;
+const pin_size_t OW_TX_PIN = PIN_PA2;
+const pin_size_t OW_RX_PIN = PIN_PA1;
 #endif
 
 uint8_t clocks_for_reading = 25; // Clocks to use for HX711 read (25 - Channel A, 26 - Channel B)
@@ -90,6 +94,9 @@ void loop() {
         Serial.println(payload);
     }
     else delay(5);
+
+    // Light up when scanned
+    digitalWriteFast(LED_ORANGE, millis() < led_timeout);
 #endif
 }
 
