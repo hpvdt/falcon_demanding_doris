@@ -35,10 +35,10 @@ bool readyHX() {
  * 
  * @return Reading, not sign extended
  */
-uint32_t readHX() {
+int32_t readHX() {
     uint8_t clocks = 25;
 
-    uint32_t reading = 0L;
+    int32_t reading = 0L;
 
     const uint8_t clk_mask = (1 << digital_pin_to_bit_position[PDSCK]);
     const uint8_t input_shift = digital_pin_to_bit_position[DOUT];
@@ -57,6 +57,9 @@ uint32_t readHX() {
 
     // Shift back down since data was only actually present the first 24 cycles
     reading = reading >> (clocks - 24); 
+
+    // Sign extension based on leading bit
+    if ((reading & 0x800000L) != 0) reading = reading | 0xFF000000L;
 
     return reading;
 }
