@@ -3,7 +3,7 @@
 #include "onewire.hpp"
 
 // Both LEDs are PWM enabled
-const pin_size_t LED_ORANGE = PIN_PA3;
+const pin_size_t LED_GREEN = PIN_PA3;
 const pin_size_t LED_RED = PIN_PB0; // Usually not installed
 
 const uint8_t TORSION_ADDR_CUTOFF = 12; // Addresses of this and above will read for torsion (channel B)
@@ -46,7 +46,7 @@ void setup() {
 
     Serial.begin(9600);
 
-    pinMode(LED_ORANGE, OUTPUT);
+    pinMode(LED_GREEN, OUTPUT);
     pinMode(LED_RED, OUTPUT);
 }
 
@@ -59,6 +59,6 @@ void loop() {
     else delay(5);
 
     // Light up when scanned
-    digitalWriteFast(LED_ORANGE, millis() < led_timeout);
+    digitalWriteFast(LED_GREEN, millis() < led_timeout);
 }
 
