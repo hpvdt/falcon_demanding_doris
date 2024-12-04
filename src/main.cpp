@@ -16,8 +16,6 @@ uint8_t clocks_for_reading = 25; // Clocks to use for HX711 read (25 - Channel A
 /**
  * \brief Get the OneWire address for the board 
  * 
- * \note On ATtiny85-based boards this is done using a resistive divider
- * 
  * \return Address for the device to respond to
  */
 uint8_t get_ow_address() {
@@ -33,7 +31,7 @@ uint8_t get_ow_address() {
     delayMicroseconds(1000); // Just to ensure their values stabilize
     index = VPORTC.IN & 0xF;
 
-    if (index >= TORSION_ADDR_CUTOFF) clocks_for_reading = 26;   // Torsion
+    if (index >= TORSION_ADDR_CUTOFF) clocks_for_reading = 26;  // Torsion
     else clocks_for_reading = 25;                               // Strain
 
     return index;
@@ -53,6 +51,7 @@ void setup() {
 void loop() {
     if (readyHX()) {
         int32_t payload = readHX(clocks_for_reading);
+        payload = ow_generate_test_data();
         setPayload(payload);
         Serial.println(payload);
     }

@@ -176,7 +176,7 @@ void sendData(uint32_t data, uint8_t width) {
     uint8_t pin_mask = digital_pin_to_bit_mask[pinTX];
 
     uint32_t mask = 1L << (width - 1); // Needs the `1L` otherwise mask will be 16 bits wide
-    
+
     for (uint8_t i = width; i > 0; i--) {
 
         bool currentBit = ((mask & data) != 0);
@@ -211,4 +211,25 @@ void setPayload(int32_t newPayload) {
     noInterrupts();
     oneWirePayloadOut = newPayload;
     interrupts();
+}
+
+/**
+ * \brief Generates a test value for the OneWire protocol
+ * 
+ * \note The number is a random number with a deterministic checksum
+ * 
+ * \return Generated test value
+ */
+int32_t ow_generate_test_data() {
+    uint32_t byte0 = rand();
+    uint32_t byte1 = rand();
+    uint32_t sum = byte0 + byte1;
+
+    int32_t result = 0;
+
+    result  = (byte0 & 0xFF)  << 16;
+    result |= (byte1 & 0xFF)  <<  8;
+    result |= (sum   & 0xFF)  <<  0;
+
+    return result;
 }
