@@ -3,12 +3,12 @@
 
 #include <stdint.h>
 
-extern const uint8_t oneWireBitPeriod;
-extern const uint8_t oneWirePulsePeriod;
-extern const uint8_t oneWireAddressWidth;
-extern const uint8_t oneWireDataWidth;
+extern const uint8_t OW_BIT_PERIOD;
+extern const uint8_t OW_PULSE_PERIOD;
+extern const uint8_t OW_ADDRESS_WIDTH;
+extern const uint8_t OW_DATA_WIDTH;
 
-extern const uint8_t oneWireNumAttempts;
-extern const uint16_t oneWireTimeoutComms;
+extern const uint8_t OW_NUM_ATTEMPTS;
+extern const uint16_t OW_TIMEOUT_COMMS;
 
 #endif
