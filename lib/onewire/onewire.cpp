@@ -175,9 +175,12 @@ void sendData(uint32_t data, uint8_t width) {
     // Port values to set TX without changing other pins
     uint8_t pin_mask = digital_pin_to_bit_mask[pinTX];
 
+    uint32_t mask = 1L << (width - 1); // Needs the `1L` otherwise mask will be 16 bits wide
+    
     for (uint8_t i = width; i > 0; i--) {
-        bool currentBit = data & 1;
-        data = data >> 1;
+
+        bool currentBit = ((mask & data) != 0);
+        mask = mask >> 1;
 
         if (currentBit == true) {
             // Falling edge for 1 bit
