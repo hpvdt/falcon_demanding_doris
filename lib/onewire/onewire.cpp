@@ -9,15 +9,11 @@ void handleOneWireInput(); // Since it is only meant to be used as an interrupt 
 void sendData(uint32_t data, uint8_t width);
 
 unsigned long led_timeout = 0;
-const unsigned long LED_PERIOD = 3000; // Period to illumniate following a scan
+const unsigned long LED_PERIOD = 30; // Period to illumniate following a scan
 
-#ifndef ARD_NANO
 // Hardcode as constants to compile more optimized code
 const uint8_t pinRX = PIN_PA1;
 const uint8_t pinTX = PIN_PA2;
-#else
-volatile uint8_t pinRX, pinTX;
-#endif
 volatile uint8_t oneWireAddress;
 volatile int32_t oneWirePayloadOut;
 volatile int32_t oneWirePayloadIn;
@@ -33,10 +29,6 @@ volatile bool oneWireListener;
  * @param isListener Set to true if device is listener (default is true). If a listener, it will set the handler interrupt routine up.
  */
 void setupOneWire(uint8_t RX, uint8_t TX, uint8_t address, bool isListener) {
-#ifdef ARD_NANO
-    pinRX = RX;
-    pinTX = TX;
-#endif
     pinMode(pinRX, INPUT);
     pinMode(pinTX, OUTPUT);
     digitalWrite(pinTX, LOW);
@@ -45,9 +37,7 @@ void setupOneWire(uint8_t RX, uint8_t TX, uint8_t address, bool isListener) {
     oneWireListener = isListener;
 
     attachInterrupt(digitalPinToInterrupt(pinRX), handleOneWireInput, CHANGE);
-#ifndef ARD_NANO
     CPUINT.LVL1VEC = PORTA_PORT_vect_num; // Make the OneWire interrupt top priority
-#endif
 }
 
 /**
@@ -62,12 +52,10 @@ void handleOneWireInput() {
 
     led_timeout = millis() + LED_PERIOD;
 
-#ifndef ARD_NANO
+
     // Read directly from registers for max speed
     bool reading = (VPORTA.IN & digital_pin_to_bit_mask[pinRX]) >> digital_pin_to_bit_position[pinRX];
-#else
-    bool reading = digitalRead(pinRX);
-#endif
+
     unsigned long delta = present - lastEdge;
 
     static uint8_t bitCount = 0;
@@ -184,21 +172,13 @@ bool requestOneWire(uint8_t targetAdd, int32_t *destination) {
 void sendData(uint32_t data, uint8_t width) {
     noInterrupts(); // Don't want interrupts to catch outgoing message
 
-#ifndef ARD_NANO
     // Port values to set TX without changing other pins
     uint8_t pin_mask = digital_pin_to_bit_mask[pinTX];
-#endif
 
     for (uint8_t i = width; i > 0; i--) {
         bool currentBit = data & 1;
         data = data >> 1;
 
-#ifdef ARD_NANO
-        digitalWrite(pinTX, currentBit);
-        delayMicroseconds(bitPeriod - oneWirePulsePeriod);
-        digitalWrite(pinTX, !currentBit);
-        delayMicroseconds(oneWirePulsePeriod);
-#else
         if (currentBit == true) {
             // Falling edge for 1 bit
             PORTA.OUTSET = pin_mask;
@@ -213,7 +193,6 @@ void sendData(uint32_t data, uint8_t width) {
             PORTA.OUTSET = pin_mask;
             delayMicroseconds(oneWirePulsePeriod);
         }
-#endif
     }
 
     digitalWriteFast(pinTX, LOW); // Release line
