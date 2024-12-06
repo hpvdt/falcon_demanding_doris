@@ -48,13 +48,13 @@ void ow_send_data(uint32_t data, uint8_t width);
 void ow_set_payload(int32_t newPayload);
 
 /**
- * \brief Generates a test value for the OneWire protocol
+ * \brief Generates a new test value for the one wire protocol
  * 
  * \note The number is a random number with a deterministic checksum
  * 
- * \return Generated test value
+ * \warning This seems to take a lot of time and messes up interrupts
  */
-int32_t ow_generate_test_data();
+void ow_update_test_data();
 
 /**
  * \brief Returns if the device is in testing mode or not for one wire system

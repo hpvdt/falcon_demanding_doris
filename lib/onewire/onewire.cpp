@@ -22,6 +22,7 @@ const uint8_t OW_TX = PIN_PA2;
 volatile uint8_t ow_address;
 volatile int32_t ow_payload_out;
 volatile int32_t ow_payload_in;
+volatile int32_t ow_payload_test;
 volatile bool ow_message_received_flag;
 volatile bool ow_listener_flag;
 
@@ -52,10 +53,8 @@ void ow_input_handler() {
     static unsigned long last_edge = 0; // Store previous edge timestamp
     unsigned long present = micros();
 
-    ow_led_timeout_mark = millis() + LED_PERIOD;
-
     // Read directly from registers for max speed
-    bool reading = (VPORTA.IN & digital_pin_to_bit_mask[OW_RX]) >> digital_pin_to_bit_position[OW_RX];
+    bool reading = (VPORTA.IN & digital_pin_to_bit_mask[OW_RX]) != 0;
 
     unsigned long delta = present - last_edge;
 
@@ -91,8 +90,10 @@ void ow_input_handler() {
 
     if (check_address) {
         if (temp_data == ow_address) {
-            if (ow_testing_mode) ow_send_data(ow_generate_test_data(), OW_DATA_WIDTH);
-            else ow_send_data(ow_payload_out, OW_DATA_WIDTH);
+            ow_led_timeout_mark = millis() + LED_PERIOD;
+
+            if (ow_testing_mode) ow_send_data(ow_payload_test, OW_DATA_WIDTH);
+            else ow_send_data(ow_payload_out, OW_DATA_WIDTH);            
         }
         else if (temp_data == OW_ADDR_TEST_ENABLE) ow_testing_mode = true;
         else if (temp_data == OW_ADDR_TEST_DISABLE) ow_testing_mode = false;
@@ -187,7 +188,7 @@ void ow_set_payload(int32_t new_payload) {
     interrupts();
 }
 
-int32_t ow_generate_test_data() {
+void ow_update_test_data() {
     uint32_t byte_0 = rand();
     uint32_t byte_1 = rand();
     uint32_t sum = byte_0 + byte_1;
@@ -198,5 +199,5 @@ int32_t ow_generate_test_data() {
     result |= (byte_1 & 0xFF)  <<  8;
     result |= (sum    & 0xFF)  <<  0;
 
-    return result;
+    ow_payload_test = result;
 }

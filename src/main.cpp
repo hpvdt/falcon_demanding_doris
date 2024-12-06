@@ -70,11 +70,13 @@ void loop() {
         ow_set_payload(payload);
         Serial.println(payload);
     }
-    else delay(5);
-
+    else {
+        ow_update_test_data();
+        delay(5);
+    }
     // Light up when scanned
     bool led_active = millis() < ow_led_timeout_mark;
-    if (ow_get_testing_mode_active() == true) led_active = !led_active; // Invedrt LED in testing mode
-    digitalWriteFast(LED_GREEN, millis() < ow_led_timeout_mark);
+    if (ow_get_testing_mode_active() == true) led_active = !led_active; // Invert LED in testing mode
+    digitalWriteFast(LED_GREEN, led_active);
 }
 
