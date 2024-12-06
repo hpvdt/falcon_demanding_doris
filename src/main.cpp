@@ -35,26 +35,46 @@ uint8_t get_ow_address() {
 }
 
 void setup() {
-    uint8_t ow_address = get_ow_address();
-    ow_setup(ow_address, true);
-    setupHX();
+    pinMode(LED_GREEN, OUTPUT);
+    pinMode(LED_RED, OUTPUT);
 
     Serial.begin(9600);
 
-    pinMode(LED_GREEN, OUTPUT);
-    pinMode(LED_RED, OUTPUT);
+    uint8_t ow_address = get_ow_address();
+    int status = ow_setup(ow_address, true);
+    if (status != 0) {
+        while (1) {
+            switch (status) {
+            case 1:
+                Serial.println(F("ERROR: Assigned reserved OW address!"));
+                break;
+            
+            default:
+                Serial.println(F("ERROR: Issue in OW setup!"));
+                break;
+            }
+
+            digitalWrite(LED_GREEN, HIGH);
+            delay(250);
+            digitalWrite(LED_GREEN, LOW);
+            delay(250);
+        }
+    }
+
+    setupHX();
 }
 
 void loop() {
     if (readyHX()) {
         int32_t payload = readHX(clocks_for_reading);
-        payload = ow_generate_test_data();
         ow_set_payload(payload);
         Serial.println(payload);
     }
     else delay(5);
 
     // Light up when scanned
-    digitalWriteFast(LED_GREEN, millis() < led_timeout);
+    bool led_active = millis() < ow_led_timeout_mark;
+    if (ow_get_testing_mode_active() == true) led_active = !led_active; // Invedrt LED in testing mode
+    digitalWriteFast(LED_GREEN, millis() < ow_led_timeout_mark);
 }
 

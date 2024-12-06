@@ -13,7 +13,7 @@
  */
 void ow_input_handler(); // Since it is only meant to be used as an interrupt it is locally scoped
 
-unsigned long led_timeout = 0;
+unsigned long ow_led_timeout_mark = 0;
 const unsigned long LED_PERIOD = 30; // Period to illumniate following a scan
 
 // Hardcode as constants to compile more optimized code
@@ -25,25 +25,34 @@ volatile int32_t ow_payload_in;
 volatile bool ow_message_received_flag;
 volatile bool ow_listener_flag;
 
+volatile bool ow_testing_mode = false;
 
-void ow_setup(uint8_t address, bool isListener) {
+bool ow_get_testing_mode_active() {
+    return ow_testing_mode;
+}
+
+int ow_setup(uint8_t address, bool isListener) {
     pinMode(OW_RX, INPUT);
     pinMode(OW_TX, OUTPUT);
     digitalWrite(OW_TX, LOW);
+
+    // Protect special addresses
+    if ((address == OW_ADDR_TEST_DISABLE) || (address == OW_ADDR_TEST_ENABLE)) return 1;
 
     ow_address = address;
     ow_listener_flag = isListener;
 
     attachInterrupt(digitalPinToInterrupt(OW_RX), ow_input_handler, CHANGE);
     CPUINT.LVL1VEC = PORTA_PORT_vect_num; // Make the OneWire interrupt top priority
+
+    return 0;
 }
 
 void ow_input_handler() {
     static unsigned long last_edge = 0; // Store previous edge timestamp
     unsigned long present = micros();
 
-    led_timeout = millis() + LED_PERIOD;
-
+    ow_led_timeout_mark = millis() + LED_PERIOD;
 
     // Read directly from registers for max speed
     bool reading = (VPORTA.IN & digital_pin_to_bit_mask[OW_RX]) >> digital_pin_to_bit_position[OW_RX];
@@ -75,39 +84,37 @@ void ow_input_handler() {
     // Process the edge
     temp_data = (temp_data << 1) + reading;
     bit_count++;
-    
-    // Process depending on if it's a caller or not
-    if (ow_listener_flag) {
-        // If there's an address check for a match
-        if (bit_count == OW_ADDRESS_WIDTH) {
 
-            if (temp_data == ow_address) ow_send_data(ow_payload_out, OW_DATA_WIDTH);
-            else {
-                // Ignore the other device's response
-                ignore_count = OW_DATA_WIDTH;
-            }
+    // Potential states to react based on node role
+    bool check_address      = ow_listener_flag && (bit_count == OW_ADDRESS_WIDTH);
+    bool received_response  = (!ow_listener_flag) && (bit_count == OW_DATA_WIDTH);
 
-            // Reset for next message
-            bit_count = 0;
-            temp_data = 0;
+    if (check_address) {
+        if (temp_data == ow_address) {
+            if (ow_testing_mode) ow_send_data(ow_generate_test_data(), OW_DATA_WIDTH);
+            else ow_send_data(ow_payload_out, OW_DATA_WIDTH);
         }
+        else if (temp_data == OW_ADDR_TEST_ENABLE) ow_testing_mode = true;
+        else if (temp_data == OW_ADDR_TEST_DISABLE) ow_testing_mode = false;
+        else ignore_count = OW_DATA_WIDTH; // Ignore the other device's response
+
+        // Reset for next message
+        bit_count = 0;
+        temp_data = 0;
     }
-    else {
-        // If awaiting a response
-        if (bit_count == OW_DATA_WIDTH) {
-            ow_message_received_flag = true;
+    if (received_response) {
+        ow_message_received_flag = true;
 
-            // Extend sign by prefixing ones as needed prior to recording it
-            if (temp_data & (1L << (OW_DATA_WIDTH - 1))) {
-                ow_payload_in = temp_data | (0xFFFFFFFF << (OW_DATA_WIDTH - 1));
-            }
-            else ow_payload_in = temp_data; 
-
-            // Reset for next message
-            bit_count = 0;
-            ignore_count = 0;
-            temp_data = 0;
+        // Extend sign by prefixing ones as needed prior to recording it
+        if (temp_data & (1L << (OW_DATA_WIDTH - 1))) {
+            ow_payload_in = temp_data | (0xFFFFFFFF << (OW_DATA_WIDTH - 1));
         }
+        else ow_payload_in = temp_data; 
+
+        // Reset for next message
+        bit_count = 0;
+        ignore_count = 0;
+        temp_data = 0;
     }
 }
 

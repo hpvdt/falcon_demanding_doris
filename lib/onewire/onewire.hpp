@@ -3,15 +3,18 @@
 
 #include <Arduino.h>
 
-extern unsigned long led_timeout; // Mark for if the activity LED should be on
+extern unsigned long ow_led_timeout_mark; // Mark for if the activity LED should be on
 
 /**
  * \brief Setups up a one wire interface
  * 
  * \param address Address for device
  * \param isListener Set to true if device is listener. If a listener, it will set the handler interrupt routine up.
+ * 
+ * \return - `0` if everything went well
+ * \return - `1` if the address provided is invalid
  */
-void ow_setup(uint8_t address, bool isListener);
+int ow_setup(uint8_t address, bool isListener);
 
 /**
  * \brief Requests and receives data from device on the one wire bus
@@ -52,5 +55,12 @@ void ow_set_payload(int32_t newPayload);
  * \return Generated test value
  */
 int32_t ow_generate_test_data();
+
+/**
+ * \brief Returns if the device is in testing mode or not for one wire system
+ * 
+ * \return `true` if in testing mode, `false` for normal operation
+ */
+bool ow_get_testing_mode_active();
 
 #endif
