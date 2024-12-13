@@ -64,7 +64,7 @@ void ow_input_handler() {
 
     // Too short since last edge, ignore. Probably setting up the next actual edge
     if (delta < (3 * OW_PULSE_PERIOD)) return;
-    else last_edge = present;
+    last_edge = present;
 
     // See if the edge is late (new message or timeout)
     if (delta > (2 * OW_BIT_PERIOD)) {
