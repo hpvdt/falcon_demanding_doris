@@ -191,7 +191,7 @@ void ow_set_payload(int32_t new_payload) {
 void ow_update_test_data() {
     uint32_t byte_0 = rand();
     uint32_t byte_1 = rand();
-    uint32_t sum = byte_0 + byte_1;
+    uint32_t sum = byte_0 + byte_1 + ow_address; // Include address as part of sum to check origin
 
     int32_t result = 0;
 
