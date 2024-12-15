@@ -13,6 +13,15 @@
  */
 void ow_input_handler(); // Since it is only meant to be used as an interrupt it is locally scoped
 
+/**
+ * \brief Add the checksu to a payload 
+ * 
+ * \param data Data to base the checksumed payload (lowest 24 bits)
+ *
+ * \return Payload with checksum affixed 
+ */
+int32_t ow_affix_checksum(int32_t data);
+
 unsigned long ow_led_timeout_mark = 0;
 const unsigned long LED_PERIOD = 30; // Period to illumniate following a scan
 
@@ -183,21 +192,37 @@ void ow_send_data(uint32_t data, uint8_t width) {
 }
 
 void ow_set_payload(int32_t new_payload) {
+
+    new_payload = ow_affix_checksum(new_payload);
+
     noInterrupts();
     ow_payload_out = new_payload;
     interrupts();
 }
 
 void ow_update_test_data() {
-    uint32_t byte_0 = rand();
-    uint32_t byte_1 = rand();
-    uint32_t sum = byte_0 + byte_1 + ow_address; // Include address as part of sum to check origin
+    uint32_t half_0 = rand();
+    uint32_t half_1 = rand();
 
-    int32_t result = 0;
+    int32_t result = half_0 + (half_1 << 15);
 
-    result  = (byte_0 & 0xFF)  << 16;
-    result |= (byte_1 & 0xFF)  <<  8;
-    result |= (sum    & 0xFF)  <<  0;
+    result = result & 0x00FFFFF0;
+    result |= ow_address; // Add explicit address for better tracking
 
-    ow_payload_test = result;
+    ow_payload_test = ow_affix_checksum(result);
+}
+
+int32_t ow_affix_checksum(int32_t data) {
+    uint8_t checksum = ow_address; // Always start checksum with address to ensure origin
+    checksum += data & 0xFF;
+    checksum += (data >> 8) & 0xFF;
+    checksum += (data >> 16) & 0xFF;
+
+    data = data & 0x00FFFFFFL;
+
+    uint32_t checksum_placement = (uint32_t)(checksum) << 24;
+
+    data = data | checksum_placement;
+
+    return data;
 }
