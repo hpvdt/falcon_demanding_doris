@@ -1,3 +1,6 @@
+>[!WARNING]
+>This code and board is obsolete and has been superceeded by the functionality of the new [wing module](https://github.com/hpvdt/falcon_wing_module).
+
 # Spar Sensor Firmware
 
 Firmware meant to run on the spar strain sensor boards. The purpose of this code is simple: read the HX711 and provide the most recent value over the one wire interface when requested of the board.
